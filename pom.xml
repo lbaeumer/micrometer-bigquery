@@ -6,7 +6,36 @@
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+
     <name>${project.groupId}:${project.artifactId}</name>
+    <description>micrometer-bigquery is a bigquery micrometer implementation.
+        BigQuery is a great choice to keep track of your app's activity.
+        You can use the bigquery registry implementation in the same way than the other registry implementations provided by micrometer.
+        https://github.com/micrometer-metrics/micrometer
+    </description>
+    <url>https://github.com/lbaeumer/micrometer-bigquery</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Lui Baeumer</name>
+            <email>lui.baeumer@gmail.com</email>
+            <organization>Github</organization>
+            <organizationUrl>https://github.com/lbaeumer/micrometer-bigquery</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git@github.com:lbaeumer/micrometer-bigquery.git</connection>
+        <developerConnection>scm:git@github.com:lbaeumer/micrometer-bigquery.git</developerConnection>
+        <url>https://github.com/lbaeumer/micrometer-bigquery.git</url>
+    </scm>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -14,7 +43,6 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <gpg.keyFingerprint>B3DDE2112D0DFAED382A93907629FD691565E3A2</gpg.keyFingerprint>
-        <!--gpg.keyname>lui.baeumer@gmail.com</gpg.keyname -->
     </properties>
 
     <dependencyManagement>
@@ -32,16 +60,14 @@
         <snapshotRepository>
             <id>ossrh</id>
             <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-            <!--url>https://oss.sonatype.org/content/repositories/snapshots</url -->
         </snapshotRepository>
-        <!-- repository>
-            <id>ossrh</id>
+        <repository>
+            <id>ossrh2</id>
             <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository -->
+        </repository>
     </distributionManagement>
 
     <dependencies>
-
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
@@ -89,18 +115,18 @@
             </plugins>
         </pluginManagement>
 
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-            <resource>
-                <directory>src/main/appengine</directory>
-                <filtering>true</filtering>
-            </resource>
-        </resources>
-
         <plugins>
+            <!--plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.7</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
@@ -141,30 +167,21 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>net.nicoulaj.maven.plugins</groupId>
+                <artifactId>checksum-maven-plugin</artifactId>
+                <version>1.10</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>artifacts</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- put your configurations here -->
+                </configuration>
+            </plugin>
         </plugins>
-
     </build>
-
-    <licenses>
-        <license>
-            <name>The Apache License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-        </license>
-    </licenses>
-
-    <developers>
-        <developer>
-            <name>Lui Baeumer</name>
-            <email>lui.baeumer@gmail.com</email>
-            <organization>Mobilesol</organization>
-            <organizationUrl>https://mobilesol.de</organizationUrl>
-        </developer>
-    </developers>
-
-    <scm>
-        <connection>scm:git:git@github.com:lbaeumer/micrometer-bigquery.git</connection>
-        <developerConnection>scm:git@github.com:lbaeumer/micrometer-bigquery.git</developerConnection>
-        <url>http://github.com/simpligility/ossrh-demo/tree/master</url>
-    </scm>
-
 </project>
