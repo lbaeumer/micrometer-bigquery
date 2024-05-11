@@ -5,12 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>micrometer-bigquery is a bigquery micrometer implementation.
         BigQuery is a great choice to keep track of your app's activity.
-        You can use the bigquery registry implementation in the same way than the other registry implementations provided by micrometer.
+        You can use the bigquery registry implementation in the same way than the other registry implementations
+        provided by micrometer.
         https://github.com/micrometer-metrics/micrometer
     </description>
     <url>https://github.com/lbaeumer/micrometer-bigquery</url>
@@ -55,17 +56,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh2</id>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
 
     <dependencies>
         <dependency>
@@ -116,17 +106,17 @@
         </pluginManagement>
 
         <plugins>
-            <!--plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.7</version>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.4.0</version>
                 <extensions>true</extensions>
                 <configuration>
-                    <serverId>ossrh</serverId>
-                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                    <publishingServerId>central</publishingServerId>
+                    <tokenAuth>true</tokenAuth>
+                    <autoPublish>true</autoPublish>
                 </configuration>
-            </plugin-->
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
@@ -178,9 +168,6 @@
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
-                    <!-- put your configurations here -->
-                </configuration>
             </plugin>
         </plugins>
     </build>

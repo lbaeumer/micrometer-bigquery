@@ -42,6 +42,8 @@ public interface BigQueryConfig extends StepRegistryConfig {
     }
 
     /**
+     * The dataset name under which the metrics will appear in Google Cloud.
+     *
      * @return The BigQuery dataset. Defaults to "appmetrics".
      */
     default String dataset() {

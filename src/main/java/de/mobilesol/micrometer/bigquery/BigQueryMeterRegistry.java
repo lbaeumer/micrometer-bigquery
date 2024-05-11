@@ -483,8 +483,8 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
 
     public static class Field {
 
-        private String key;
-        private double value;
+        private final String key;
+        private final double value;
 
         public Field(String key, double value) {
             this.key = key;
@@ -494,6 +494,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
         public String getKey() {
             return key;
         }
+
         public double getValue() {
             return value;
         }
