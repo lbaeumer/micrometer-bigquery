@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -106,7 +107,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
                         Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(
                                 config.proxyHost(), config.proxyPort()));
 
-                        logger.debug("using proxy " + proxy);
+                        logger.debug("using proxy {}", proxy);
                         return new NetHttpTransport.Builder()
                                 .setProxy(proxy).build();
                     })
@@ -114,6 +115,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
         }
 
         if (config.location() != null) {
+            logger.debug("set location {}", config.location());
             builder.setLocation(config.location());
         }
 
@@ -133,49 +135,6 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
         }
     }
 
-    private void createDatasetAndTable() {
-        try {
-            Table table = bigquery.getTable(config.dataset(), config.table());
-            if (table == null) {
-
-                Dataset dataset = bigquery.getDataset(config.dataset());
-                logger.debug("the table " + config.table() + " does not exist. dataset=" + dataset);
-                if (dataset == null) {
-                    DatasetInfo datasetInfo = DatasetInfo.newBuilder(config.dataset())
-                            .build();
-                    bigquery.create(datasetInfo);
-                    logger.info("successfully created BigQuery dataset {}.", config.dataset());
-                }
-
-                Schema schema =
-                        Schema.of(
-                                com.google.cloud.bigquery.Field.of("_time", StandardSQLTypeName.TIMESTAMP),
-                                com.google.cloud.bigquery.Field.of("_measurement", StandardSQLTypeName.STRING),
-                                com.google.cloud.bigquery.Field.of("metric_type", StandardSQLTypeName.STRING),
-                                com.google.cloud.bigquery.Field.of("value", StandardSQLTypeName.BIGNUMERIC),
-                                com.google.cloud.bigquery.Field.of("sum", StandardSQLTypeName.BIGNUMERIC),
-                                com.google.cloud.bigquery.Field.of("mean", StandardSQLTypeName.BIGNUMERIC),
-                                com.google.cloud.bigquery.Field.of("upper", StandardSQLTypeName.BIGNUMERIC),
-                                com.google.cloud.bigquery.Field.of("count", StandardSQLTypeName.BIGNUMERIC),
-                                com.google.cloud.bigquery.Field.of("duration", StandardSQLTypeName.BIGNUMERIC)
-                        );
-
-                TableId tableId = TableId.of(config.dataset(), config.table());
-                TableDefinition tableDefinition = StandardTableDefinition.of(schema);
-                TableInfo tableInfo = TableInfo.newBuilder(tableId, tableDefinition).build();
-
-                bigquery.create(tableInfo);
-                logger.info("successfully created BigQuery table {}.", config.table());
-            } else {
-                logger.debug("table {} exists. nothing to do.", config.table());
-            }
-
-        } catch (Throwable e) {
-            logger.error("unable to create BigQuery dataset "
-                    + config.dataset(), e);
-        }
-    }
-
     @Override
     protected void publish() {
         if (skipPublishingMetrics) {
@@ -186,7 +145,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
 
         try {
             for (List<Meter> batch : MeterPartition.partition(this, config.batchSize())) {
-                logger.debug("handle batch size " + batch.size());
+                logger.debug("handle batch size {}", batch.size());
                 InsertAllRequest.Builder req = InsertAllRequest.newBuilder(config.dataset(), config.table());
 
                 int cnt = 0;
@@ -200,8 +159,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
                             gauge -> writeGauge(gauge.getId(), gauge.value(getBaseTimeUnit())),
                             counter -> writeCounter(counter.getId(), counter.count()),
                             this::writeFunctionTimer,
-                            this::writeMeter
-                    );
+                            this::writeMeter);
 
                     String measurementExclusionFilter = config.measurementExclusionFilter();
                     for (Object metric : mat.toArray()) {
@@ -209,123 +167,198 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
 
                         if (measurementExclusionFilter != null
                                 && ((String) row.get("_measurement")).matches(measurementExclusionFilter)) {
-                            logger.debug("skip row " + row);
+                            logger.debug("skip excl row {}", row);
                         } else if (config.skipZeroCounter()
                                 && "counter".equals(row.get("metric_type"))
-                                && Math.abs((double) row.get("value")) < 0.001) {
-                            logger.debug("skip null row " + row);
+                                && Math.abs((double) row.get("value")) < Double.MIN_VALUE) {
+                            logger.debug("skip zero counter row {}", row);
+                        } else if (config.skipZeroTimer()
+                                && "timer".equals(row.get("metric_type"))
+                                && (row.get("count") == null || ((long) row.get("count")) == 0)) {
+                            logger.debug("skip zero timer row {}", row);
+                        } else if (config.skipZeroHistogram()
+                                && "histogram".equals(row.get("metric_type"))
+                                && (row.get("count") == null || Math.abs((double) row.get("count")) < Double.MIN_VALUE)) {
+                            logger.debug("skip zero histogram row {}", row);
                         } else {
                             cnt++;
-                            logger.debug("add row=" + row);
+                            logger.debug("add row={}", row);
                             req.addRow(row);
                         }
                     }
                 }
 
                 if (cnt > 0) {
-                    logger.debug("preparing to publish " + cnt + " entries.");
+                    logger.debug("preparing to publish {} entries.", cnt);
                     InsertAllRequest request = req.build();
 
                     // send to bigquery
                     int i = 0;
                     while (i <= MAX_RETRY) {
-                        InsertAllResponse resp = bigquery.insertAll(request);
-                        logger.debug("insert operation result " + resp);
+                        logger.debug("publish {} entries. attempt {}/" + MAX_RETRY, cnt, i);
+                        InsertAllResponse resp;
+                        try {
+                            resp = bigquery.insertAll(request);
+                        } catch (BigQueryException e) {
+                            logger.warn("could not send metrics to BigQuery, error={}", e.getCode(), e);
+                            if (e.getCode() == 404) {
+                                if (config.autoCreateDataset()) {
+                                    logger.info("BigQuery table {} was not found, so try to create it.", config.table());
+                                    createDatasetAndTable(request);
+                                    // give bq some seconds to create the missing structures before trying again.
+                                    Thread.sleep(5000);
+                                } else {
+                                    logger.warn("dataset was not found, it will not be created for you. " +
+                                            "You might want to set autoCreateDataset to let Micrometer create the dataset for you." +
+                                            " Alternatively you have to create the dataset manually.");
+                                    skipPublishingMetrics = true;
+                                }
+                            } else if (e.getCode() == 403) {
+                                logger.warn("You do not have enough privileges to write to BigQuery. Please check your service account {}", config.credentials());
+                                skipPublishingMetrics = true;
+                            }
+                            i++;
+                            continue;
+                        }
+                        logger.debug("insert operation result {}", resp);
 
                         if (resp.hasErrors()) {
-                            logger.error("sending to BigQuery failed with " + resp
-                                    + "; attempt " + i + "/" + MAX_RETRY);
+                            logger.error("sending to BigQuery failed with {}; attempt {}/" + MAX_RETRY, resp, i);
                             if (i < MAX_RETRY && config.autoCreateFields()) {
                                 createNewFields(request, resp);
 
                                 // it might take some seconds for the changes to become into effect
-                                logger.debug("try again ... " + i + "/" + MAX_RETRY);
+                                logger.debug("try again ... {}/" + MAX_RETRY, i);
                                 i++;
                                 Thread.sleep(5000L * i * i);
                             } else {
                                 break;
                             }
                         } else {
-                            logger.debug("successfully sent " + request.getRows().size() + "/" + batch.size()
-                                    + " items to BigQuery");
+                            logger.debug("successfully sent {}/{} items to BigQuery", request.getRows().size(), batch.size());
                             break;
                         }
                     }
                 } else {
-                    logger.debug("skipped sending " + batch.size()
-                            + " items to BigQuery");
+                    logger.debug("skipped sending {} items to BigQuery", batch.size());
                 }
             }
         } catch (BigQueryException e) {
-            // we might create the dataset/table for you, other errors will
-            // only be reported
-            logger.warn("could not send metrics to BigQuery", e);
-            if (e.getError() != null && "notFound".equals(e.getError().getReason())) {
-                if (config.autoCreateDataset()) {
-                    logger.info("BigQuery table {} was not found, so try to create it.", config.table());
-                    createDatasetAndTable();
-                } else {
-                    logger.warn("dataset was not found, it will not be created for you. " +
-                            "You might want to set autoCreateDataset to let Micrometer create the dataset for you." +
-                            " Alternatively you have to create the dataset manually.");
-                    skipPublishingMetrics = true;
-                }
-            } else if (e.getCode() == 403) {
-                logger.warn("You do not have enough privileges to write to BigQuery. Please check your service account "
-                        + config.credentials());
-                skipPublishingMetrics = true;
-            }
+            logger.warn("could not send metrics to BigQuery, error={}", e.getCode(), e);
         } catch (Throwable e) {
             logger.error("failed to send metrics to BigQuery", e);
         }
     }
 
+    private void createDatasetAndTable(InsertAllRequest request) {
+        try {
+            Table table = bigquery.getTable(config.dataset(), config.table());
+            if (table == null) {
+
+                Dataset dataset = bigquery.getDataset(config.dataset());
+                // create the dataset if it does not exist
+                logger.debug("the table {} does not exist. dataset={}", config.table(), dataset);
+                if (dataset == null) {
+                    DatasetInfo.Builder datasetInfoBuilder = DatasetInfo.newBuilder(config.dataset());
+                    if (config.location() != null) {
+                        datasetInfoBuilder.setLocation(config.location());
+                    }
+
+                    bigquery.create(datasetInfoBuilder.build());
+                    logger.info("successfully triggered creating BigQuery dataset {}.", config.dataset());
+                }
+
+                // create the table
+                List<com.google.cloud.bigquery.Field> minimumSchema = new ArrayList<>();
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("_time", StandardSQLTypeName.TIMESTAMP));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("_measurement", StandardSQLTypeName.STRING));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("metric_type", StandardSQLTypeName.STRING));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("value", StandardSQLTypeName.BIGNUMERIC));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("sum", StandardSQLTypeName.BIGNUMERIC));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("mean", StandardSQLTypeName.BIGNUMERIC));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("upper", StandardSQLTypeName.BIGNUMERIC));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("count", StandardSQLTypeName.BIGNUMERIC));
+                minimumSchema.add(com.google.cloud.bigquery.Field.of("duration", StandardSQLTypeName.BIGNUMERIC));
+
+                // adding missing fields from request
+                Map<String, StandardSQLTypeName> missingFields = new TreeMap<>();
+                for (InsertAllRequest.RowToInsert row : request.getRows()) {
+                    determinePotentiallyNonExistingFields(row, missingFields);
+                }
+                for (com.google.cloud.bigquery.Field f : minimumSchema) {
+                    missingFields.remove(f.getName());
+                }
+                logger.debug("adding fields={}", missingFields);
+                for (String newField : missingFields.keySet()) {
+                    minimumSchema.add(com.google.cloud.bigquery.Field.of(newField, missingFields.get(newField)));
+                }
+
+                Schema schema = Schema.of(minimumSchema);
+
+                TableId tableId = TableId.of(config.dataset(), config.table());
+                TableDefinition tableDefinition = StandardTableDefinition.of(schema);
+                TableInfo tableInfo = TableInfo.newBuilder(tableId, tableDefinition).build();
+
+                bigquery.create(tableInfo);
+                logger.info("successfully triggered creating BigQuery table {}.", config.table());
+            } else {
+                logger.debug("table {} exists. nothing to do.", config.table());
+            }
+        } catch (Throwable e) {
+            logger.error("unable to create BigQuery dataset {}", config.dataset(), e);
+        }
+    }
+
+    private void determinePotentiallyNonExistingFields(InsertAllRequest.RowToInsert row,
+                                                       Map<String, StandardSQLTypeName>
+                                                               potentiallyNonExistingFields) {
+        row.getContent().forEach((key, value) -> {
+
+            if (value instanceof Integer || value instanceof Long) {
+                potentiallyNonExistingFields.put(key, StandardSQLTypeName.INT64);
+            } else if (value instanceof BigDecimal || value instanceof Double) {
+                potentiallyNonExistingFields.put(key, StandardSQLTypeName.BIGNUMERIC);
+            } else if (value instanceof Number) {
+                potentiallyNonExistingFields.put(key, StandardSQLTypeName.NUMERIC);
+            } else if (value instanceof String) {
+                potentiallyNonExistingFields.put(key, StandardSQLTypeName.STRING);
+            } else {
+                logger.warn("BigQuery mapping unknown type {}. map to string", value.getClass());
+                potentiallyNonExistingFields.put(key, StandardSQLTypeName.STRING);
+            }
+        });
+    }
+
     // create new fields in BigQuery if these are missing
     private void createNewFields(InsertAllRequest request, InsertAllResponse resp) {
         Map<String, StandardSQLTypeName>
-                potentiallyNonExistingFields = new HashMap<>();
+                potentiallyNonExistingFields = new TreeMap<>();
 
         resp.getInsertErrors().forEach((i, e) -> e.forEach(error -> {
             // if fields are missing these have to be created
             if (error.getMessage().startsWith("no such field")) {
                 InsertAllRequest.RowToInsert row = request.getRows().get(i.intValue());
-                row.getContent().forEach((key, value) -> {
-
-                    if (logger.isDebugEnabled()) {
-                        logger.debug(i + ". " + key + ":" + value.getClass());
-                    }
-
-                    if (value instanceof Integer || value instanceof Long) {
-                        potentiallyNonExistingFields.put(key, StandardSQLTypeName.INT64);
-                    } else if (value instanceof BigDecimal || value instanceof Double) {
-                        potentiallyNonExistingFields.put(key, StandardSQLTypeName.BIGNUMERIC);
-                    } else if (value instanceof Number) {
-                        potentiallyNonExistingFields.put(key, StandardSQLTypeName.NUMERIC);
-                    } else if (value instanceof String) {
-                        potentiallyNonExistingFields.put(key, StandardSQLTypeName.STRING);
-                    } else {
-                        logger.warn("BigQuery mapping unknown type " + value.getClass() + ". map to string");
-                        potentiallyNonExistingFields.put(key, StandardSQLTypeName.STRING);
-                    }
-                });
+                determinePotentiallyNonExistingFields(row, potentiallyNonExistingFields);
+            } else {
+                logger.debug("unknown field inserting error: {}", error);
             }
         }));
 
         if (!potentiallyNonExistingFields.isEmpty()) {
-            logger.debug("potentiallyNonExisting=" + potentiallyNonExistingFields);
+            logger.debug("potentiallyNonExisting={}", potentiallyNonExistingFields);
             Table table = bigquery.getTable(config.dataset(), config.table());
             Schema newSchema = determineNewSchema(table, potentiallyNonExistingFields);
 
             if (newSchema != null) {
                 // Update the table with the new schema
+                logger.debug("now update table schema");
                 Table updatedTable =
                         table.toBuilder().setDefinition(StandardTableDefinition.of(newSchema)).build();
                 updatedTable.update();
 
-                logger.debug("successfully updated fields " + newSchema.getFields());
+                logger.debug("successfully updated fields {}", newSchema.getFields());
             }
         }
-
     }
 
     private Schema determineNewSchema(Table table, Map<String, StandardSQLTypeName> potentiallyNonExistingFields) {
@@ -337,7 +370,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
                         : Collections.emptyList());
         Set<String> existingFields = new HashSet<>();
         fieldList.forEach(f -> existingFields.add(f.getName()));
-        logger.debug("existingFields=" + existingFields);
+        logger.debug("existingFields={}", existingFields);
 
         Map<String, StandardSQLTypeName> createdFields = new HashMap<>();
         potentiallyNonExistingFields.forEach((n, t) -> {
@@ -350,7 +383,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
         if (createdFields.isEmpty()) {
             return null;
         } else {
-            logger.info("going to create new BigQuery fields " + createdFields);
+            logger.info("going to create new BigQuery fields {}", createdFields);
             return Schema.of(fieldList);
         }
     }
@@ -455,11 +488,8 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
     }
 
     public static class Builder {
-
         private final BigQueryConfig config;
-
         private Clock clock = Clock.SYSTEM;
-
         private ThreadFactory threadFactory = DEFAULT_THREAD_FACTORY;
 
         Builder(BigQueryConfig config) {
@@ -486,7 +516,7 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
         private final String key;
         private final double value;
 
-        public Field(String key, double value) {
+        Field(String key, double value) {
             this.key = key;
             this.value = value;
         }

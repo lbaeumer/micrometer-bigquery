@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>micrometer-bigquery is a bigquery micrometer implementation.
         BigQuery is a great choice to keep track of your app's activity.
-        You can use the bigquery registry implementation in the same way than the other registry implementations
+        You can use the bigquery registry implementation in the same way as the other registry implementations
         provided by micrometer.
         https://github.com/micrometer-metrics/micrometer
     </description>
@@ -51,8 +51,16 @@
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-bom</artifactId>
-                <version>1.12.5</version>
+                <version>1.13.6</version>
                 <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>libraries-bom</artifactId>
+                <version>26.49.0</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -61,39 +69,29 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
-            <version>1.12.4</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-bigquery</artifactId>
-            <version>2.38.2</version>
-            <scope>compile</scope>
         </dependency>
 
         <!-- test scope -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.11.0</version>
+            <version>5.11.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version>
+            <version>1.18.34</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.14</version>
+            <version>1.5.11</version>
             <scope>test</scope>
         </dependency>
 

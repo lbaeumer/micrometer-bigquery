@@ -1,2 +1,5 @@
 /target
 .DS_Store
+/*.iml
+/src/test/resources/account.json
+/.idea

@@ -13,7 +13,7 @@ provides interesting opportunities to visualize the users activity.
 <dependency>
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
@@ -84,7 +84,7 @@ public class Micrometer {
 
             @Override
             public String location() {
-                return "EU";
+                return "europe-west3";
             }
         };
 

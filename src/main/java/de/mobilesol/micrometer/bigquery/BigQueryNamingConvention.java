@@ -49,10 +49,6 @@ public class BigQueryNamingConvention implements NamingConvention {
         return sanitize(nameDelegate.name(name, type, baseUnit).replace("=", "_"));
     }
 
-    private String sanitize(String string) {
-        return PATTERN_SPECIAL_CHARACTERS.matcher(string).replaceAll("\\\\$1");
-    }
-
     @Override
     public String tagKey(String key) {
         // `time` cannot be a field key or tag key
@@ -67,4 +63,7 @@ public class BigQueryNamingConvention implements NamingConvention {
         return sanitize(this.nameDelegate.tagValue(value).replace('\n', ' '));
     }
 
+    private String sanitize(String string) {
+        return PATTERN_SPECIAL_CHARACTERS.matcher(string).replaceAll("\\\\$1");
+    }
 }
