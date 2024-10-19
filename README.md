@@ -9,16 +9,16 @@ provides interesting opportunities to visualize the users activity.
 
 1. adding dependency to your pom.xml
 
-```
+```xml
 <dependency>
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
 2. Initializing micrometer in your code. This is an example taken from a productive project.
-```
+```java
 import de.mobilesol.micrometer.bigquery.BigQueryConfig;
 import de.mobilesol.micrometer.bigquery.BigQueryMeterRegistry;
 import io.micrometer.core.instrument.Clock;
@@ -84,7 +84,7 @@ public class Micrometer {
 
             @Override
             public String location() {
-                return "EU";
+                return "europe-west3";
             }
         };
 
@@ -101,7 +101,7 @@ public class Micrometer {
 This code will run on Google AppEngine without additional authentication.
 
 3. Sending metrics in your code. This is equal to the standard micrometer behaviour.
-```
+```java
 Micrometer.Metrics().counter("do.something.count",
     "tag1", "somevalue1",
     "tag2", "somevalue2").increment();

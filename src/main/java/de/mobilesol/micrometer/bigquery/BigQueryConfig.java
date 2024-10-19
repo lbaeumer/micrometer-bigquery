@@ -31,14 +31,18 @@ import static io.micrometer.core.instrument.config.validate.PropertyValidator.ge
  */
 public interface BigQueryConfig extends StepRegistryConfig {
 
-    /**
-     * Accept configuration defaults
-     */
-    BigQueryConfig DEFAULT = k -> null;
-
     @Override
     default String prefix() {
         return "bigquery";
+    }
+
+    /**
+     * Specifies Google Cloud Platform project which runs your BigQuery tables.
+     *
+     * @return The Google Cloud Project ID.
+     */
+    default String projectId() {
+        return getString(this, "projectId").required().get();
     }
 
     /**
@@ -80,21 +84,30 @@ public interface BigQueryConfig extends StepRegistryConfig {
     }
 
     /**
+     * Clear the registry after sending data.
+     *
+     * @return {@code true} if Micrometer should clear the registry metrics after sending. This results in sending metrics only once to BigQuery.
+     */
+    default boolean skipZeroTimer() {
+        return getBoolean(this, "skipZeroTimer").orElse(false);
+    }
+
+    /**
+     * Clear the registry after sending data.
+     *
+     * @return {@code true} if Micrometer should clear the registry metrics after sending. This results in sending metrics only once to BigQuery.
+     */
+    default boolean skipZeroHistogram() {
+        return getBoolean(this, "skipZeroHistogram").orElse(false);
+    }
+
+    /**
      * Defining a regular expression that excludes measurements from being sent to BigQuery.
      *
      * @return {@code true} a regular expression that matches measurement names or null if all measurements should be sent.
      */
     default String measurementExclusionFilter() {
         return getString(this, "measurementExclusionFilter").orElse(null);
-    }
-
-    /**
-     * Specifies Google Cloud Platform project which runs your BigQuery tables.
-     *
-     * @return The Google Cloud Project ID.
-     */
-    default String projectId() {
-        return getString(this, "projectId").required().get();
     }
 
     /**
@@ -151,5 +164,4 @@ public interface BigQueryConfig extends StepRegistryConfig {
                 checkRequired("table", BigQueryConfig::table)
         );
     }
-
 }
