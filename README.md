@@ -13,7 +13,7 @@ provides interesting opportunities to visualize the users activity.
 <dependency>
     <groupId>de.mobilesol.micrometer</groupId>
     <artifactId>micrometer-bigquery</artifactId>
-    <version>0.0.2</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -54,9 +54,8 @@ public class Micrometer {
             }
 
             @Override
-            public boolean skipZeroCounter() {
-                // defines if a message if sent to bigquery if the count is 0.
-                // The value 'false' is the default micrometer behaviour, but you might want to reduce unnecessary requests.  
+            public boolean sendOnlyOneRequest() {
+                // if you want to send a meter only once to BigQuery
                 return true;
             }
 
@@ -78,7 +77,7 @@ public class Micrometer {
 
             @Override
             public String measurementExclusionFilter() {
-                // define a regular expression to suppress pattern
+                // define a regular expression to suppress measurement pattern
                 return "(http_server_.*|system_.*|process_.*|jvm_.*)";
             }
 

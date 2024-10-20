@@ -19,7 +19,7 @@ public class TestBigQueryConfig implements BigQueryConfig {
         // if you want the fields to be created automatically
         return true;
     }
-
+/*
     @Override
     public boolean skipZeroCounter() {
         // defines if a message is sent to bigquery if the count is 0.
@@ -36,7 +36,7 @@ public class TestBigQueryConfig implements BigQueryConfig {
     public boolean skipZeroHistogram() {
         return true;
     }
-
+*/
     @Override
     public String projectId() {
         return "my-google-project";
@@ -60,6 +60,11 @@ public class TestBigQueryConfig implements BigQueryConfig {
     @Override
     public boolean enabled() {
         // false will deactivate the registry.
+        return true;
+    }
+
+    @Override
+    public boolean sendOnlyOneRequest() {
         return true;
     }
 

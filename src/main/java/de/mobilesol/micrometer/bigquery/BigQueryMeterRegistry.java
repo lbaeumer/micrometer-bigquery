@@ -186,6 +186,10 @@ public class BigQueryMeterRegistry extends StepMeterRegistry {
                             req.addRow(row);
                         }
                     }
+
+                    if (config.sendOnlyOneRequest()) {
+                        this.remove(meter);
+                    }
                 }
 
                 if (cnt > 0) {
