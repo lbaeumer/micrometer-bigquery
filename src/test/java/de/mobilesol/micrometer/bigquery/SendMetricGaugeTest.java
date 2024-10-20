@@ -3,6 +3,7 @@ package de.mobilesol.micrometer.bigquery;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,10 +54,10 @@ public class SendMetricGaugeTest {
         metrics.gauge("mgauge1", 12);
         Thread.sleep(30000);
 
-        metrics.gauge("mgauge1", 18);
+        metrics.gauge("mgauge1", Tags.of("x", "y"), 18);
         Thread.sleep(30000);
 
-        metrics.gauge("mgauge1", 23);
+        metrics.gauge("mgauge3", 23);
         Thread.sleep(30000);
     }
 }

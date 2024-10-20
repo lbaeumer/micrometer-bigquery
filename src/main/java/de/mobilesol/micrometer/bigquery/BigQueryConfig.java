@@ -75,21 +75,30 @@ public interface BigQueryConfig extends StepRegistryConfig {
     }
 
     /**
-     * Clear the registry after sending data.
+     * Skip sending counter zero values.
      *
-     * @return {@code true} if Micrometer should clear the registry metrics after sending. This results in sending metrics only once to BigQuery.
+     * @return {@code true} if Micrometer should skip sending counter zero values to BigQuery.
      */
     default boolean skipZeroCounter() {
         return getBoolean(this, "skipZeroCounter").orElse(false);
     }
 
     /**
-     * Clear the registry after sending data.
+     * Skip sending timer zero values.
      *
-     * @return {@code true} if Micrometer should clear the registry metrics after sending. This results in sending metrics only once to BigQuery.
+     * @return {@code true} if Micrometer should skip sending timer zero values to BigQuery.
      */
     default boolean skipZeroTimer() {
         return getBoolean(this, "skipZeroTimer").orElse(false);
+    }
+
+    /**
+     * Skip sending histogram zero values.
+     *
+     * @return {@code true} if Micrometer should skip sending histogram zero values to BigQuery.
+     */
+    default boolean skipZeroHistogram() {
+        return getBoolean(this, "skipZeroHistogram").orElse(false);
     }
 
     /**
@@ -97,8 +106,8 @@ public interface BigQueryConfig extends StepRegistryConfig {
      *
      * @return {@code true} if Micrometer should clear the registry metrics after sending. This results in sending metrics only once to BigQuery.
      */
-    default boolean skipZeroHistogram() {
-        return getBoolean(this, "skipZeroHistogram").orElse(false);
+    default boolean sendOnlyOneRequest() {
+        return getBoolean(this, "sendOnlyOneRequest").orElse(false);
     }
 
     /**
